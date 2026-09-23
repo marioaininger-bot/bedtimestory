@@ -52,6 +52,31 @@
   }
   .wrap{max-width:720px;margin:0 auto;padding:40px 20px 64px;position:relative;z-index:1;}
 
+  /* Funkelnde Sterne — sichtbar bis die Geschichte fertig zum Vorlesen ist */
+  #starsTwinkle{
+    position:fixed;inset:0;overflow:hidden;
+    pointer-events:none;z-index:0;
+    opacity:1;transition:opacity .9s ease;
+  }
+  #starsTwinkle.is-hidden{opacity:0;}
+  #starsTwinkle .star-dot{
+    position:absolute;top:var(--y);left:var(--x);
+    width:var(--s);height:var(--s);border-radius:50%;
+    background:#fff;box-shadow:0 0 4px 1px #ffffffaa;
+    animation:starTwinkle var(--dur) ease-in-out infinite;
+    animation-delay:var(--delay);
+  }
+  @keyframes starTwinkle{
+    0%,100%{opacity:.15;transform:scale(.7);}
+    50%{opacity:1;transform:scale(1.2);}
+  }
+  @media (prefers-reduced-motion: reduce){
+    #starsTwinkle .star-dot{animation:none;opacity:.5;}
+  }
+  @media print{
+    #starsTwinkle{display:none;}
+  }
+
   .hero{text-align:center;margin-bottom:36px;}
   .hero .glyphs{font-size:28px;letter-spacing:14px;margin-bottom:6px;opacity:.9;}
   .hero h1{
@@ -260,6 +285,7 @@
 </style>
 </head>
 <body>
+<div id="starsTwinkle" aria-hidden="true"></div>
 <div class="wrap">
 
   <div class="hero">
@@ -343,6 +369,27 @@
 </div>
 
 <script>
+/* ---------- Funkelnde Sterne ---------- */
+const starsTwinkle = document.getElementById('starsTwinkle');
+(function initTwinklingStars(){
+  const COUNT = 45;
+  const frag = document.createDocumentFragment();
+  for(let i=0; i<COUNT; i++){
+    const dot = document.createElement('span');
+    dot.className = 'star-dot';
+    const size = (Math.random() * 1.6 + 1).toFixed(2) + 'px';
+    dot.style.setProperty('--x', (Math.random()*100).toFixed(2) + '%');
+    dot.style.setProperty('--y', (Math.random()*100).toFixed(2) + '%');
+    dot.style.setProperty('--s', size);
+    dot.style.setProperty('--dur', (Math.random()*2.5 + 2).toFixed(2) + 's');
+    dot.style.setProperty('--delay', (Math.random()*4).toFixed(2) + 's');
+    frag.appendChild(dot);
+  }
+  starsTwinkle.appendChild(frag);
+})();
+function showTwinklingStars(){ starsTwinkle.classList.remove('is-hidden'); }
+function hideTwinklingStars(){ starsTwinkle.classList.add('is-hidden'); }
+
 /* ---------- Genres (20 total, bis zu 5 wählbar) ---------- */
 const GENRES = [
   {id:'abenteuer', emoji:'⚔️', label:'Abenteuer'},
@@ -606,6 +653,7 @@ async function renderStory(){
   newBtn.disabled = true;
   storyPanel.style.display = 'block';
   storyTitle.textContent = "📖 …";
+  showTwinklingStars();
 
   lastLoaderVariant = lastLoaderVariant === 'moon' ? 'sheep' : 'moon';
   const messagesByVariant = {
@@ -639,9 +687,11 @@ async function renderStory(){
     storyTitle.textContent = "📖 " + (data.title || 'Gute Nacht Geschichte');
     const paras = (data.story || '').split(/\n{2,}/).filter(Boolean);
     storyText.innerHTML = paras.map(p => `<p>${p.replace(/\n/g,'<br>')}</p>`).join('');
+    hideTwinklingStars();
   }catch(err){
     storyTitle.textContent = "📖 Hoppla";
     storyText.innerHTML = `<p>Die Geschichte konnte gerade nicht erzählt werden (${err.message}). Bitte versuch es nochmal.</p>`;
+    showTwinklingStars();
   }finally{
     clearInterval(loaderInterval);
     tellBtn.disabled = false;
