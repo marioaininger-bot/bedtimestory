@@ -526,7 +526,11 @@ async function renderStory(){
       headers: {'Content-Type':'application/json'},
       body: JSON.stringify(currentPayload())
     });
-    if(!res.ok) throw new Error('Server-Fehler: ' + res.status);
+    if(!res.ok){
+      let msg = 'Status ' + res.status;
+      try{ const errBody = await res.json(); if(errBody.error) msg = errBody.error; }catch(e){}
+      throw new Error(msg);
+    }
     const data = await res.json();
     storyTitle.textContent = "📖 " + (data.title || 'Gute Nacht Geschichte');
     const paras = (data.story || '').split(/\n{2,}/).filter(Boolean);
