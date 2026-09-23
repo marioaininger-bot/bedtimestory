@@ -229,7 +229,25 @@
     40%{opacity:1;transform:translateY(-3px);}
   }
   @media (prefers-reduced-motion: reduce){
-    .loader .moon,.loader .star{animation:none;}
+    .loader .moon,.loader .star,.loader .sheep{animation:none;}
+  }
+
+  /* Schäfchen-Loader */
+  .loader .sheep-scene{
+    position:relative;width:180px;height:70px;
+    display:flex;align-items:flex-end;justify-content:center;gap:16px;
+  }
+  .loader .sheep-scene::after{
+    content:"";position:absolute;left:0;right:0;bottom:6px;
+    border-bottom:2px dashed var(--card-border);
+  }
+  .loader .sheep{font-size:30px;animation:sheepHop 1s ease-in-out infinite;}
+  .loader .sheep:nth-child(2){animation-delay:.18s;}
+  .loader .sheep:nth-child(3){animation-delay:.36s;}
+  @keyframes sheepHop{
+    0%,100%{transform:translateY(0) rotate(0deg);}
+    35%{transform:translateY(-20px) rotate(-8deg);}
+    55%{transform:translateY(0) rotate(4deg);}
   }
 
   @media print{
@@ -556,21 +574,21 @@ function currentPayload(){
   };
 }
 
-async function renderStory(){
-  tellBtn.disabled = true;
-  const newBtn = document.getElementById('newStoryBtn');
-  newBtn.disabled = true;
-  storyPanel.style.display = 'block';
-  storyTitle.textContent = "📖 …";
+let lastLoaderVariant = 'sheep'; // wird beim ersten Aufruf zu 'moon'
 
-  const loadingMessages = [
-    'Sterne werden gesammelt …',
-    'Figuren werden geweckt …',
-    'Die Geschichte wird gewebt …',
-    'Ein bisschen Zaubersstaub wird verstreut …',
-    'Fast fertig geträumt …'
-  ];
-  storyText.innerHTML = `
+function loaderMarkup(variant, firstMessage){
+  if(variant === 'sheep'){
+    return `
+      <div class="loader">
+        <div class="sheep-scene">
+          <span class="sheep">🐑</span>
+          <span class="sheep">🐑</span>
+          <span class="sheep">🐑</span>
+        </div>
+        <div class="loader-text" id="loaderText">${firstMessage}<span class="dots"><span>.</span><span>.</span><span>.</span></span></div>
+      </div>`;
+  }
+  return `
     <div class="loader">
       <div class="moon-orbit">
         <span class="star" style="top:0;left:50%;">⭐</span>
@@ -578,8 +596,25 @@ async function renderStory(){
         <span class="star" style="top:0;left:50%;">⭐</span>
         <span class="moon">🌙</span>
       </div>
-      <div class="loader-text" id="loaderText">${loadingMessages[0]}<span class="dots"><span>.</span><span>.</span><span>.</span></span></div>
+      <div class="loader-text" id="loaderText">${firstMessage}<span class="dots"><span>.</span><span>.</span><span>.</span></span></div>
     </div>`;
+}
+
+async function renderStory(){
+  tellBtn.disabled = true;
+  const newBtn = document.getElementById('newStoryBtn');
+  newBtn.disabled = true;
+  storyPanel.style.display = 'block';
+  storyTitle.textContent = "📖 …";
+
+  lastLoaderVariant = lastLoaderVariant === 'moon' ? 'sheep' : 'moon';
+  const messagesByVariant = {
+    moon: ['Sterne werden gesammelt …','Figuren werden geweckt …','Die Geschichte wird gewebt …','Ein bisschen Zauberstaub wird verstreut …','Fast fertig geträumt …'],
+    sheep: ['Schäfchen werden gezählt …','Über den Zaun gehüpft …','Traumwolle wird gesponnen …','Die Wiese wird vorbereitet …','Gleich ist es soweit …']
+  };
+  const loadingMessages = messagesByVariant[lastLoaderVariant];
+
+  storyText.innerHTML = loaderMarkup(lastLoaderVariant, loadingMessages[0]);
   let msgIdx = 0;
   const loaderTextEl = document.getElementById('loaderText');
   const loaderInterval = setInterval(() => {
