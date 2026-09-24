@@ -1,0 +1,12 @@
+name = "bedtimestory-api"
+main = "generate-story.js"
+compatibility_date = "2024-09-01"
+
+# Nach dem Deploy erreichbar unter:
+#   https://bedtimestory-api.<dein-cloudflare-subdomain>.workers.dev
+#
+# API-Key als Secret setzen (wird nie im Code oder im Browser sichtbar):
+#   wrangler secret put ANTHROPIC_API_KEY
+#
+# Deploy:
+#   wrangler deploy
