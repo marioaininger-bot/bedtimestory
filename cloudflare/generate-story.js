@@ -28,6 +28,31 @@ function json(status, body, env) {
   });
 }
 
+// Parst die Modellantwort tolerant: auch abgeschnittenes oder von Codeblöcken
+// umgebenes JSON liefert Titel und Geschichte statt rohem JSON-Text.
+function parseStory(raw) {
+  const cleaned = raw.replace(/^```(?:json)?/i, '').replace(/```$/, '').trim();
+  try {
+    const obj = JSON.parse(cleaned);
+    if (obj && typeof obj.story === 'string') return obj;
+  } catch (e) { /* weiter mit Fallback */ }
+
+  const decode = (str) => {
+    try { return JSON.parse('"' + str + '"'); } catch (e) {
+      return str.replace(/\\n/g, '\n').replace(/\\"/g, '"');
+    }
+  };
+  const titleMatch = cleaned.match(/"title"\s*:\s*"((?:[^"\\]|\\.)*)"/);
+  const storyMatch = cleaned.match(/"story"\s*:\s*"((?:[^"\\]|\\.)*)(?:"|$)/);
+  if (storyMatch) {
+    return {
+      title: titleMatch ? decode(titleMatch[1]) : 'Gute Nacht Geschichte',
+      story: decode(storyMatch[1].replace(/\\$/, '')),
+    };
+  }
+  return { title: 'Gute Nacht Geschichte', story: cleaned };
+}
+
 export default {
   async fetch(request, env) {
     if (request.method === 'OPTIONS') {
@@ -88,7 +113,7 @@ Lesedauer: ${duration}`;
         },
         body: JSON.stringify({
           model: 'claude-sonnet-5',
-          max_tokens: 2000,
+          max_tokens: 8000,
           system: systemPrompt,
           messages: [{ role: 'user', content: userPrompt }],
         }),
@@ -103,13 +128,7 @@ Lesedauer: ${duration}`;
       const textBlock = (data.content || []).find((b) => b.type === 'text');
       const raw = textBlock ? textBlock.text.trim() : '';
 
-      let parsed;
-      try {
-        const cleaned = raw.replace(/^```json/, '').replace(/^```/, '').replace(/```$/, '').trim();
-        parsed = JSON.parse(cleaned);
-      } catch (e) {
-        parsed = { title: 'Gute Nacht Geschichte', story: raw };
-      }
+      const parsed = parseStory(raw);
 
       return json(200, parsed, env);
     } catch (err) {
