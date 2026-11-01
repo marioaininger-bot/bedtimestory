@@ -461,6 +461,8 @@
     <h2 id="storyTitle">📖 Titel</h2>
     <div id="storyText"></div>
     <div class="story-actions">
+      <button class="btn-secondary" id="speakBtn">🔊 Vorlesen</button>
+      <button class="btn-secondary" id="stopBtn" style="display:none;">⏹️ Stopp</button>
       <button class="btn-secondary" id="newStoryBtn">🔄 Neue Geschichte</button>
       <button class="btn-secondary" id="printBtn">🖨️ Drucken</button>
     </div>
@@ -765,6 +767,8 @@ function loaderMarkup(variant, firstMessage){
 }
 
 async function renderStory(){
+  stopSpeech();
+  speechParts = [];
   tellBtn.disabled = true;
   const newBtn = document.getElementById('newStoryBtn');
   newBtn.disabled = true;
@@ -804,6 +808,7 @@ async function renderStory(){
     storyTitle.textContent = "📖 " + (data.title || 'Gute Nacht Geschichte');
     const paras = (data.story || '').split(/\n{2,}/).filter(Boolean);
     storyText.innerHTML = paras.map(p => `<p>${p.replace(/\n/g,'<br>')}</p>`).join('');
+    speechParts = paras;
     hideTwinklingStars();
   }catch(err){
     storyTitle.textContent = "📖 Hoppla";
@@ -815,6 +820,62 @@ async function renderStory(){
     newBtn.disabled = false;
   }
 }
+
+/* Vorlesen (Web Speech API, läuft komplett im Browser) */
+let speechParts = [];
+let speechState = 'idle'; // idle | playing | paused
+const speakBtn = document.getElementById('speakBtn');
+const stopBtn = document.getElementById('stopBtn');
+const speechOK = 'speechSynthesis' in window && 'SpeechSynthesisUtterance' in window;
+if(!speechOK){ speakBtn.style.display = 'none'; }
+
+function pickGermanVoice(){
+  const voices = speechSynthesis.getVoices().filter(v => /^de(-|_|$)/i.test(v.lang));
+  if(!voices.length) return null;
+  return voices.find(v => /(natural|premium|enhanced|neural|online)/i.test(v.name))
+      || voices.find(v => /^de-DE/i.test(v.lang))
+      || voices[0];
+}
+if(speechOK){ speechSynthesis.onvoiceschanged = () => {}; }
+
+function updateSpeechUI(){
+  speakBtn.textContent = speechState === 'playing' ? '⏸️ Pause'
+                       : speechState === 'paused' ? '▶️ Weiter' : '🔊 Vorlesen';
+  stopBtn.style.display = speechState === 'idle' ? 'none' : '';
+}
+function stopSpeech(){
+  if(!speechOK) return;
+  speechState = 'idle';
+  speechSynthesis.cancel();
+  updateSpeechUI();
+}
+function speakFrom(i){
+  if(i >= speechParts.length){ speechState = 'idle'; updateSpeechUI(); return; }
+  const u = new SpeechSynthesisUtterance(speechParts[i].replace(/\s*\n\s*/g,' '));
+  const v = pickGermanVoice();
+  if(v) u.voice = v;
+  u.lang = v ? v.lang : 'de-DE';
+  u.rate = 0.85;
+  u.pitch = 1;
+  u.onend = () => { if(speechState === 'playing') speakFrom(i + 1); };
+  u.onerror = e => { if(e.error !== 'canceled' && e.error !== 'interrupted'){ speechState = 'idle'; updateSpeechUI(); } };
+  speechSynthesis.speak(u);
+}
+speakBtn.addEventListener('click', () => {
+  if(!speechParts.length) return;
+  if(speechState === 'idle'){
+    speechSynthesis.cancel();
+    speechState = 'playing';
+    speakFrom(0);
+  }else if(speechState === 'playing'){
+    speechSynthesis.pause(); speechState = 'paused';
+  }else{
+    speechSynthesis.resume(); speechState = 'playing';
+  }
+  updateSpeechUI();
+});
+stopBtn.addEventListener('click', stopSpeech);
+window.addEventListener('pagehide', stopSpeech);
 
 tellBtn.addEventListener('click', renderStory);
 document.getElementById('newStoryBtn').addEventListener('click', renderStory);
