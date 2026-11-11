@@ -8,5 +8,9 @@ compatibility_date = "2024-09-01"
 # API-Key als Secret setzen (wird nie im Code oder im Browser sichtbar):
 #   wrangler secret put ANTHROPIC_API_KEY
 #
+# Zugangswort (Zauberwort) als Secret setzen - ohne dieses Secret lehnt der
+# Worker alle Anfragen ab:
+#   wrangler secret put STORY_KEY
+#
 # Deploy:
 #   wrangler deploy

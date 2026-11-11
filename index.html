@@ -452,6 +452,14 @@
     </div>
   </section>
 
+  <section class="panel" id="keyPanel" style="display:none">
+    <h2>🔑 Zauberwort</h2>
+    <p class="sub">Die Geschichten-Maschine ist nur für die Familie. Bitte das Zauberwort eingeben.</p>
+    <div class="field">
+      <input type="password" id="storyKey" autocomplete="current-password" placeholder="Zauberwort" aria-label="Zauberwort">
+    </div>
+  </section>
+
   <div class="cta-row">
     <button class="btn-primary" id="tellBtn">🌙 Geschichte erzählen!</button>
   </div>
@@ -766,7 +774,22 @@ function loaderMarkup(variant, firstMessage){
     </div>`;
 }
 
+/* Zugangswort (Zauberwort): wird im Browser gemerkt und als Header gesendet */
+const keyPanel = document.getElementById('keyPanel');
+const storyKeyInput = document.getElementById('storyKey');
+function getSavedKey(){ try{ return localStorage.getItem('gnc_storykey') || ''; }catch(e){ return ''; } }
+function saveKey(k){ try{ localStorage.setItem('gnc_storykey', k); }catch(e){} }
+function clearSavedKey(){ try{ localStorage.removeItem('gnc_storykey'); }catch(e){} }
+if(!getSavedKey()){ keyPanel.style.display = 'block'; }
+
 async function renderStory(){
+  const storyKey = storyKeyInput.value.trim() || getSavedKey();
+  if(!storyKey){
+    keyPanel.style.display = 'block';
+    keyPanel.scrollIntoView({behavior:'smooth', block:'center'});
+    storyKeyInput.focus();
+    return;
+  }
   stopSpeech();
   speechParts = [];
   tellBtn.disabled = true;
@@ -796,15 +819,23 @@ async function renderStory(){
   try{
     const res = await fetch(STORY_API_ENDPOINT, {
       method: 'POST',
-      headers: {'Content-Type':'application/json'},
+      headers: {'Content-Type':'application/json', 'X-Story-Key': storyKey},
       body: JSON.stringify(currentPayload())
     });
+    if(res.status === 401){
+      clearSavedKey();
+      storyKeyInput.value = '';
+      keyPanel.style.display = 'block';
+    }
     if(!res.ok){
       let msg = 'Status ' + res.status;
       try{ const errBody = await res.json(); if(errBody.error) msg = errBody.error; }catch(e){}
       throw new Error(msg);
     }
     const data = await res.json();
+    saveKey(storyKey);
+    storyKeyInput.value = '';
+    keyPanel.style.display = 'none';
     storyTitle.textContent = "📖 " + (data.title || 'Gute Nacht Geschichte');
     const paras = (data.story || '').split(/\n{2,}/).filter(Boolean);
     storyText.innerHTML = paras.map(p => `<p>${p.replace(/\n/g,'<br>')}</p>`).join('');

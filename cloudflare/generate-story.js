@@ -17,8 +17,35 @@ function corsHeaders(env) {
   return {
     'Access-Control-Allow-Origin': env.ALLOWED_ORIGIN || '*',
     'Access-Control-Allow-Methods': 'POST, OPTIONS',
-    'Access-Control-Allow-Headers': 'Content-Type',
+    'Access-Control-Allow-Headers': 'Content-Type, X-Story-Key',
   };
+}
+
+// Zugangswort ("Zauberwort"): Worker-Secret STORY_KEY (Header X-Story-Key).
+// Ohne gesetztes Secret wird alles abgelehnt (fail closed), damit niemand den
+// Worker auf Kosten des API-Keys benutzen kann. Der Vergleich läuft über
+// SHA-256-Hashes ohne vorzeitigen Abbruch.
+async function digest(text) {
+  return new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(text)));
+}
+
+async function checkStoryKey(request, env) {
+  if (!env.STORY_KEY) {
+    return json(503, {
+      error: 'Zugriffsschutz nicht eingerichtet: Secret STORY_KEY fehlt (wrangler secret put STORY_KEY).',
+      code: 'KEY_NOT_CONFIGURED',
+    }, env);
+  }
+  const [given, expected] = await Promise.all([
+    digest(request.headers.get('X-Story-Key') || ''),
+    digest(String(env.STORY_KEY)),
+  ]);
+  let diff = 0;
+  for (let i = 0; i < expected.length; i++) diff |= given[i] ^ expected[i];
+  if (diff === 0) return null;
+  // Kleine Bremse gegen automatisiertes Durchprobieren.
+  await new Promise((resolve) => setTimeout(resolve, 400));
+  return json(401, { error: 'Das Zauberwort stimmt nicht.', code: 'KEY_REQUIRED' }, env);
 }
 
 function json(status, body, env) {
@@ -62,6 +89,9 @@ export default {
     if (request.method !== 'POST') {
       return json(405, { error: 'Method Not Allowed' }, env);
     }
+
+    const denied = await checkStoryKey(request, env);
+    if (denied) return denied;
 
     const apiKey = env.ANTHROPIC_API_KEY;
     if (!apiKey) {
